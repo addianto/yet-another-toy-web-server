@@ -2,37 +2,33 @@ use std::{
     fs,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
-    thread,
     time::Duration,
 };
 
-use yet_another_toy_web_server::ThreadPool;
+use async_std::task;
 
-fn main() {
+#[async_std::main]
+async fn main() {
     // Recall previous experience in Computer Networks course,
     // especially about socket programming and binding to a port.
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-    let pool = ThreadPool::new(4);
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-
-        pool.execute(|| {
-            handle_connection(stream);
-        });
+        handle_connection(stream).await;
     }
 
     println!("Shutting down.");
 }
 
-fn handle_connection(mut stream: TcpStream) {
+async fn handle_connection(mut stream: TcpStream) {
     let buf_reader = BufReader::new(&mut stream);
     let request_line = buf_reader.lines().next().unwrap().unwrap();
 
     let (status_line, filename) = match &request_line[..] {
         "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "hello.html"),
         "GET /sleep HTTP/1.1" => {
-            thread::sleep(Duration::from_secs(5));
+            task::sleep(Duration::from_secs(5)).await;
             ("HTTP/1.1 200 OK", "hello.html")
         }
         _ => ("HTTP/1.1 404 NOT FOUND", "404.html"),
